@@ -1,12 +1,15 @@
 package connector
 
 import (
+	"strings"
+
 	"github.com/H-0-O/echo-go/internal/channel"
 )
 
 // NullConnector is used when no broadcaster is configured.
 type NullConnector struct {
-	channels map[string]channel.Channel
+	channels  map[string]channel.Channel
+	connected bool
 }
 
 // NewNullConnector creates a new NullConnector.
@@ -16,12 +19,21 @@ func NewNullConnector() *NullConnector {
 	}
 }
 
-func (c *NullConnector) Connect() error { return nil }
+func (c *NullConnector) Connect() error {
+	c.connected = true
+	return nil
+}
 
-func (c *NullConnector) Disconnect() error { return nil }
+func (c *NullConnector) Disconnect() error {
+	c.connected = false
+	return nil
+}
 
 func (c *NullConnector) ConnectionStatus() ConnectionStatus {
-	return StatusConnected
+	if c.connected {
+		return StatusConnected
+	}
+	return StatusDisconnected
 }
 
 func (c *NullConnector) OnConnectionChange(_ func(ConnectionStatus)) func() {
@@ -42,7 +54,18 @@ func (c *NullConnector) PrivateChannel(name string) channel.Channel {
 	if ch, ok := c.channels[key]; ok {
 		return ch
 	}
-	ch := &channel.NullChannel{}
+	ch := &channel.NullPrivateChannel{}
+	c.channels[key] = ch
+	return ch
+}
+
+func (c *NullConnector) EncryptedPrivateChannel(name string) channel.Channel {
+	name = strings.TrimPrefix(name, "private-encrypted-")
+	key := "private-encrypted-" + name
+	if ch, ok := c.channels[key]; ok {
+		return ch
+	}
+	ch := &channel.NullEncryptedPrivateChannel{}
 	c.channels[key] = ch
 	return ch
 }
@@ -95,3 +118,5 @@ func (c *NullConnector) SocketID() string {
 func (c *NullConnector) On(event string, callback func(data interface{})) {
 	// Do nothing
 }
+
+func (c *NullConnector) Signin() {}

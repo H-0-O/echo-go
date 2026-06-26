@@ -1,9 +1,11 @@
 package connector
 
 import (
+	"strings"
 	"sync"
 
 	pusher "github.com/H-0-O/pusher-go"
+	pusherenc "github.com/H-0-O/pusher-go/with-encryption"
 	"github.com/H-0-O/pusher-go/src/types"
 	"github.com/H-0-O/echo-go/internal/channel"
 )
@@ -37,7 +39,8 @@ func NewPusherConnector(config PusherConfig) (*PusherConnector, error) {
 		cluster = "mt1" // ponytail: pusher-go ValidateOptions requires cluster; ignored when WsHost set
 	}
 
-	client, err := pusher.NewPusher(config.Key, pusher.Options{
+	// ponytail: always use encrypt-capable client (NaCl wired); lazy pusherenc.New on first EncryptedPrivate is the upgrade path.
+	enc, err := pusherenc.New(config.Key, pusher.Options{
 		Options: types.Options{
 			Cluster:  cluster,
 			WsHost:   config.Host,
@@ -60,7 +63,7 @@ func NewPusherConnector(config PusherConfig) (*PusherConnector, error) {
 	}
 
 	return &PusherConnector{
-		client:   client,
+		client:   enc.Pusher,
 		options:  config,
 		channels: make(map[string]channel.Channel),
 	}, nil
@@ -128,6 +131,22 @@ func (c *PusherConnector) PrivateChannel(name string) channel.Channel {
 	return ch
 }
 
+// EncryptedPrivateChannel returns an encrypted private channel.
+func (c *PusherConnector) EncryptedPrivateChannel(name string) channel.Channel {
+	name = strings.TrimPrefix(name, "private-encrypted-")
+	key := "private-encrypted-" + name
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if ch, ok := c.channels[key]; ok {
+		return ch
+	}
+
+	ch := channel.NewPusherEncryptedPrivateChannel(c.client, name, c.options.Namespace)
+	c.channels[key] = ch
+	return ch
+}
+
 // PresenceChannel returns a presence channel.
 func (c *PusherConnector) PresenceChannel(name string) channel.PresenceChannel {
 	key := "presence-" + name
@@ -190,4 +209,9 @@ func (c *PusherConnector) On(event string, callback func(data interface{})) {
 	c.client.Connection.Bind(event, func(data any) {
 		callback(data)
 	})
+}
+
+// Signin triggers Pusher user authentication via the configured user-auth endpoint.
+func (c *PusherConnector) Signin() {
+	c.client.Signin()
 }

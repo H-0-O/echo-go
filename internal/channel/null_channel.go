@@ -2,6 +2,8 @@ package channel
 
 var (
 	_ Channel         = (*NullChannel)(nil)
+	_ Channel         = (*NullPrivateChannel)(nil)
+	_ Channel         = (*NullEncryptedPrivateChannel)(nil)
 	_ PresenceChannel = (*NullPresenceChannel)(nil)
 )
 
@@ -29,6 +31,10 @@ func (n *NullChannel) StopListeningToAll(callback ...func(event string, data int
 	return n
 }
 func (n *NullChannel) Unsubscribe() {}
+
+type NullPrivateChannel struct{ NullChannel }
+
+type NullEncryptedPrivateChannel struct{ NullChannel }
 
 type NullPresenceChannel struct{ NullChannel }
 

@@ -37,25 +37,41 @@ func TestChannelRegistryKeys(t *testing.T) {
 			c := tc.c
 			pub := c.Channel("a")
 			priv := c.PrivateChannel("a")
+			enc := c.EncryptedPrivateChannel("a")
 			pres := c.PresenceChannel("a")
 
 			if tc.null != nil {
-				if nullRegistryLen(tc.null) != 3 {
-					t.Fatalf("registry len = %d, want 3 distinct keys", nullRegistryLen(tc.null))
+				if nullRegistryLen(tc.null) != 4 {
+					t.Fatalf("registry len = %d, want 4 distinct keys", nullRegistryLen(tc.null))
 				}
 			} else {
 				if pub == priv {
 					t.Fatal("Channel and PrivateChannel must be distinct")
 				}
+				if pub == enc {
+					t.Fatal("Channel and EncryptedPrivateChannel must be distinct")
+				}
 				if pub == pres {
 					t.Fatal("Channel and PresenceChannel must be distinct")
+				}
+				if priv == enc {
+					t.Fatal("PrivateChannel and EncryptedPrivateChannel must be distinct")
 				}
 				if priv == pres {
 					t.Fatal("PrivateChannel and PresenceChannel must be distinct")
 				}
+				if enc == pres {
+					t.Fatal("EncryptedPrivateChannel and PresenceChannel must be distinct")
+				}
 			}
 			if c.PrivateChannel("a") != priv {
 				t.Fatal("second PrivateChannel call must return cached instance")
+			}
+			if c.EncryptedPrivateChannel("a") != enc {
+				t.Fatal("second EncryptedPrivateChannel call must return cached instance")
+			}
+			if c.EncryptedPrivateChannel("private-encrypted-a") != enc {
+				t.Fatal("EncryptedPrivateChannel with prefixed name must return cached instance")
 			}
 			if c.PresenceChannel("a") != pres {
 				t.Fatal("second PresenceChannel call must return cached instance")
@@ -70,6 +86,7 @@ func TestLeaveAllVariants(t *testing.T) {
 			c := tc.c
 			pub := c.Channel("x")
 			priv := c.PrivateChannel("x")
+			enc := c.EncryptedPrivateChannel("x")
 			pres := c.PresenceChannel("x")
 
 			c.Leave("x")
@@ -85,6 +102,9 @@ func TestLeaveAllVariants(t *testing.T) {
 			}
 			if c.PrivateChannel("x") == priv {
 				t.Fatal("expected new private channel after Leave")
+			}
+			if c.EncryptedPrivateChannel("x") == enc {
+				t.Fatal("expected new encrypted private channel after Leave")
 			}
 			if c.PresenceChannel("x") == pres {
 				t.Fatal("expected new presence channel after Leave")
@@ -132,6 +152,7 @@ func TestLeaveAllChannels(t *testing.T) {
 				if nullRegistryLen(tc.null) != 0 {
 					t.Fatalf("registry len = %d, want 0", nullRegistryLen(tc.null))
 				}
+				tc.null.Connect()
 				if c.ConnectionStatus() != StatusConnected {
 					t.Fatalf("ConnectionStatus = %q, want connected", c.ConnectionStatus())
 				}

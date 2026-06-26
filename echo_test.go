@@ -104,8 +104,20 @@ func TestNullBroadcasterConnectionStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if e.ConnectionStatus() != StatusDisconnected {
+		t.Errorf("ConnectionStatus = %q, want disconnected before Connect", e.ConnectionStatus())
+	}
+	if err := e.Connect(); err != nil {
+		t.Fatal(err)
+	}
 	if e.ConnectionStatus() != StatusConnected {
-		t.Errorf("ConnectionStatus = %q, want connected", e.ConnectionStatus())
+		t.Errorf("ConnectionStatus = %q, want connected after Connect", e.ConnectionStatus())
+	}
+	if err := e.Disconnect(); err != nil {
+		t.Fatal(err)
+	}
+	if e.ConnectionStatus() != StatusDisconnected {
+		t.Errorf("ConnectionStatus = %q, want disconnected after Disconnect", e.ConnectionStatus())
 	}
 }
 
@@ -203,8 +215,92 @@ func TestEchoLeave(t *testing.T) {
 	}
 	e.Channel("x")
 	e.Private("x")
+	e.EncryptedPrivate("x")
 	e.Presence("x")
 	e.Leave("x")
 	e.LeaveChannel("private-y")
 	e.LeaveAllChannels()
+}
+
+func TestEncryptedPrivateNullBroadcaster(t *testing.T) {
+	falseVal := false
+	e, err := New(Config{
+		Broadcaster: "null",
+		AutoConnect: &falseVal,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := e.EncryptedPrivate("secrets")
+	second := e.EncryptedPrivate("secrets")
+	if first != second {
+		t.Fatal("EncryptedPrivate must return cached instance")
+	}
+	_ = first.Listen("Event", func(data any) {})
+}
+
+func TestSigninNullBroadcaster(t *testing.T) {
+	falseVal := false
+	e, err := New(Config{
+		Broadcaster: "null",
+		AutoConnect: &falseVal,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.Signin()
+}
+
+func TestNullBroadcasterNoKey(t *testing.T) {
+	e, err := New(Config{Broadcaster: "null"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e == nil {
+		t.Fatal("expected client")
+	}
+	if e.ConnectionStatus() != StatusConnected {
+		t.Errorf("ConnectionStatus = %q, want connected (AutoConnect default)", e.ConnectionStatus())
+	}
+}
+
+type stubConnector struct {
+	*connector.NullConnector
+	connectCalls int
+	channelCalls int
+}
+
+func (s *stubConnector) Connect() error {
+	s.connectCalls++
+	return s.NullConnector.Connect()
+}
+
+func (s *stubConnector) Channel(name string) Channel {
+	s.channelCalls++
+	return s.NullConnector.Channel(name)
+}
+
+func TestCustomConnectorInjection(t *testing.T) {
+	falseVal := false
+	stub := &stubConnector{NullConnector: connector.NewNullConnector()}
+	e, err := New(Config{
+		Connector:   stub,
+		Broadcaster: "socket.io", // ignored when Connector is set
+		AutoConnect: &falseVal,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Connect(); err != nil {
+		t.Fatal(err)
+	}
+	if stub.connectCalls != 1 {
+		t.Fatalf("Connect calls = %d, want 1", stub.connectCalls)
+	}
+	e.Channel("orders")
+	if stub.channelCalls != 1 {
+		t.Fatalf("Channel calls = %d, want 1", stub.channelCalls)
+	}
+	e.Signin()
+	e.Leave("orders")
 }

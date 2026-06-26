@@ -18,6 +18,9 @@ type Connector interface {
 	// PrivateChannel returns a private channel instance.
 	PrivateChannel(name string) channel.Channel
 
+	// EncryptedPrivateChannel returns an encrypted private channel instance.
+	EncryptedPrivateChannel(name string) channel.Channel
+
 	// PresenceChannel returns a presence channel instance.
 	PresenceChannel(name string) channel.PresenceChannel
 
@@ -43,4 +46,7 @@ type Connector interface {
 
 	// LeaveAllChannels unsubscribes every channel and clears the registry.
 	LeaveAllChannels()
+
+	// Signin triggers Pusher user authentication (fire-and-forget).
+	Signin()
 }

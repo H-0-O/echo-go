@@ -15,6 +15,10 @@ type Channel = channel.Channel
 // PresenceChannel is a presence broadcast channel subscription.
 type PresenceChannel = channel.PresenceChannel
 
+// Connector is the broadcasting backend interface.
+// Use Config.Connector to inject a custom implementation.
+type Connector = connector.Connector
+
 // ConnectionStatus is the high-level WebSocket connection state.
 type ConnectionStatus = connector.ConnectionStatus
 
@@ -54,6 +58,10 @@ type Config struct {
 	CSRFToken          string
 	AutoConnect        *bool
 
+	// Connector, when non-nil, is used instead of Broadcaster string resolution.
+	// Broadcaster is ignored when Connector is set.
+	Connector Connector
+
 	// Deprecated: use Auth.Endpoint. Migrated in applyDefaults when Auth.Endpoint is empty.
 	AuthEndpoint string
 	// Deprecated: use Auth.Headers. Migrated in applyDefaults.
@@ -67,8 +75,25 @@ type Echo struct {
 }
 
 // New creates an Echo client for the given broadcaster configuration.
+//
+// Use Broadcaster "null" for a built-in no-op connector (no Key or Host required).
+// Set Config.Connector to inject a custom backend (Go equivalent of Laravel Echo
+// broadcaster: function); Broadcaster is ignored when Connector is set.
 func New(config Config) (*Echo, error) {
 	config = applyDefaults(config)
+
+	if config.Connector != nil {
+		e := &Echo{
+			connector: config.Connector,
+			config:    config,
+		}
+		if autoConnect(config) {
+			if err := e.Connect(); err != nil {
+				return nil, err
+			}
+		}
+		return e, nil
+	}
 
 	var conn connector.Connector
 
@@ -197,6 +222,11 @@ func (e *Echo) Private(name string) Channel {
 	return e.connector.PrivateChannel(name)
 }
 
+// EncryptedPrivate returns an encrypted private channel subscription (private-encrypted- prefix applied automatically).
+func (e *Echo) EncryptedPrivate(name string) Channel {
+	return e.connector.EncryptedPrivateChannel(name)
+}
+
 // Presence returns a presence channel subscription (presence- prefix applied automatically).
 func (e *Echo) Presence(name string) PresenceChannel {
 	return e.connector.PresenceChannel(name)
@@ -241,4 +271,11 @@ func (e *Echo) Disconnect() error {
 // (e.g. "connecting", "connected", "disconnected", "error").
 func (e *Echo) On(event string, callback func(data any)) {
 	e.connector.On(event, callback)
+}
+
+// Signin triggers Pusher user authentication (POST to UserAuthentication.Endpoint).
+// Fire-and-forget; call after Connect when connected (or on a "connected" callback).
+// Success/failure is handled inside pusher-go (pusher:signin / pusher:signin_success).
+func (e *Echo) Signin() {
+	e.connector.Signin()
 }
