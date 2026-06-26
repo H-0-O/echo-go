@@ -115,30 +115,69 @@ func (c *PusherConnector) Channel(name string) channel.Channel {
 
 // PrivateChannel returns a private channel.
 func (c *PusherConnector) PrivateChannel(name string) channel.Channel {
+	key := "private-" + name
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if ch, ok := c.channels[name]; ok {
+	if ch, ok := c.channels[key]; ok {
 		return ch
 	}
 
 	ch := channel.NewPusherPrivateChannel(c.client, name, c.options.Namespace)
-	c.channels[name] = ch
+	c.channels[key] = ch
 	return ch
 }
 
 // PresenceChannel returns a presence channel.
 func (c *PusherConnector) PresenceChannel(name string) channel.PresenceChannel {
+	key := "presence-" + name
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if ch, ok := c.channels[name]; ok {
+	if ch, ok := c.channels[key]; ok {
 		return ch.(channel.PresenceChannel)
 	}
 
 	ch := channel.NewPusherPresenceChannel(c.client, name, c.options.Namespace)
-	c.channels[name] = ch
+	c.channels[key] = ch
 	return ch
+}
+
+// Leave unsubscribes all subscription types for a logical channel name.
+func (c *PusherConnector) Leave(channel string) {
+	for _, name := range []string{
+		channel,
+		"private-" + channel,
+		"private-encrypted-" + channel,
+		"presence-" + channel,
+	} {
+		c.LeaveChannel(name)
+	}
+}
+
+// LeaveChannel unsubscribes a single channel by exact registry name.
+func (c *PusherConnector) LeaveChannel(name string) {
+	c.mu.Lock()
+	ch, ok := c.channels[name]
+	if ok {
+		delete(c.channels, name)
+	}
+	c.mu.Unlock()
+	if !ok {
+		return
+	}
+	ch.Unsubscribe()
+}
+
+// LeaveAllChannels unsubscribes every channel and clears the registry.
+func (c *PusherConnector) LeaveAllChannels() {
+	c.mu.Lock()
+	snapshot := c.channels
+	c.channels = make(map[string]channel.Channel)
+	c.mu.Unlock()
+	for _, ch := range snapshot {
+		ch.Unsubscribe()
+	}
 }
 
 // SocketID returns the connection socket ID.

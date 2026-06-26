@@ -7,6 +7,7 @@ type Channel interface {
 	Whisper(event string, data interface{}) Channel
 	StopListening(event string) Channel
 	StopListeningForWhisper(event string) Channel
+	Unsubscribe()
 }
 
 // PresenceChannel defines the interface for a presence channel.

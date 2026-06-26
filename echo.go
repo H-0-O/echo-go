@@ -202,6 +202,31 @@ func (e *Echo) Presence(name string) PresenceChannel {
 	return e.connector.PresenceChannel(name)
 }
 
+// Join is an alias for [Echo.Presence].
+func (e *Echo) Join(name string) PresenceChannel {
+	return e.Presence(name)
+}
+
+// Leave unsubscribes public, private, encrypted-private, and presence variants of a channel.
+func (e *Echo) Leave(channel string) {
+	e.connector.Leave(channel)
+}
+
+// LeaveChannel unsubscribes a single channel by exact name (already prefixed if private/presence).
+func (e *Echo) LeaveChannel(name string) {
+	e.connector.LeaveChannel(name)
+}
+
+// LeaveAllChannels unsubscribes every channel without disconnecting the WebSocket.
+func (e *Echo) LeaveAllChannels() {
+	e.connector.LeaveAllChannels()
+}
+
+// Listen subscribes to a public channel event (shorthand for Channel(name).Listen).
+func (e *Echo) Listen(channelName, event string, callback func(data any)) Channel {
+	return e.Channel(channelName).Listen(event, callback)
+}
+
 // Connect opens the WebSocket connection.
 func (e *Echo) Connect() error {
 	return e.connector.Connect()

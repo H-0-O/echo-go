@@ -162,3 +162,49 @@ func TestOnConnectionChangeUnsubscribe(t *testing.T) {
 		t.Errorf("got %d callbacks after unsubscribe, want %d", len(statuses), n)
 	}
 }
+
+func TestJoinAlias(t *testing.T) {
+	falseVal := false
+	e, err := New(Config{
+		Broadcaster: "null",
+		AutoConnect: &falseVal,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.Join("room") != e.Presence("room") {
+		t.Fatal("Join must return same instance as Presence")
+	}
+}
+
+func TestListenShorthand(t *testing.T) {
+	falseVal := false
+	e, err := New(Config{
+		Broadcaster: "null",
+		AutoConnect: &falseVal,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch := e.Listen("orders", "OrderCreated", func(data any) {})
+	if ch != e.Channel("orders") {
+		t.Fatal("Listen must return the public channel instance")
+	}
+}
+
+func TestEchoLeave(t *testing.T) {
+	falseVal := false
+	e, err := New(Config{
+		Broadcaster: "null",
+		AutoConnect: &falseVal,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.Channel("x")
+	e.Private("x")
+	e.Presence("x")
+	e.Leave("x")
+	e.LeaveChannel("private-y")
+	e.LeaveAllChannels()
+}

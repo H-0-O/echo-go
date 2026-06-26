@@ -30,9 +30,9 @@ func NewPusherChannel(client *pusher.Pusher, name string, namespace string) *Pus
 // Listen for an event on the channel instance.
 func (c *PusherChannel) Listen(event string, callback func(data interface{})) Channel {
 	eventName := c.Formatter.Format(event)
-	wrapped := func(data any) {
+	wrapped := pusher.Callback(func(data any) {
 		callback(data)
-	}
+	})
 	c.callbacks.Store(eventName, wrapped)
 	c.Channel.Bind(eventName, wrapped)
 	return c
@@ -61,4 +61,14 @@ func (c *PusherChannel) StopListening(event string) Channel {
 // StopListeningForWhisper stops listening for a whisper event on the channel instance.
 func (c *PusherChannel) StopListeningForWhisper(event string) Channel {
 	return c.StopListening("client-" + event)
+}
+
+// Unsubscribe removes all listeners and unsubscribes from the channel.
+func (c *PusherChannel) Unsubscribe() {
+	c.callbacks.Range(func(key, value any) bool {
+		c.Channel.Unbind(key.(string), value.(pusher.Callback))
+		c.callbacks.Delete(key)
+		return true
+	})
+	c.Pusher.Unsubscribe(c.Name)
 }

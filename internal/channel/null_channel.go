@@ -7,6 +7,7 @@ func (n *NullChannel) ListenForWhisper(event string, callback func(data interfac
 func (n *NullChannel) Whisper(event string, data interface{}) Channel { return n }
 func (n *NullChannel) StopListening(event string) Channel { return n }
 func (n *NullChannel) StopListeningForWhisper(event string) Channel { return n }
+func (n *NullChannel) Unsubscribe() {}
 
 type NullPresenceChannel struct{ NullChannel }
 

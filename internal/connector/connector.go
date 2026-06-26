@@ -34,4 +34,13 @@ type Connector interface {
 	// On registers a callback for a connection event.
 	// Common events: "connecting", "connected", "disconnected", "error"
 	On(event string, callback func(data interface{}))
+
+	// Leave unsubscribes all subscription types for a logical channel name.
+	Leave(channel string)
+
+	// LeaveChannel unsubscribes a single channel by exact registry name.
+	LeaveChannel(name string)
+
+	// LeaveAllChannels unsubscribes every channel and clears the registry.
+	LeaveAllChannels()
 }

@@ -7,7 +7,7 @@ import (
 )
 
 type PusherPresenceChannel struct {
-	*PusherPrivateChannel
+	*PusherChannel
 }
 
 func NewPusherPresenceChannel(client *pusher.Pusher, name string, namespace string) *PusherPresenceChannel {
@@ -15,7 +15,7 @@ func NewPusherPresenceChannel(client *pusher.Pusher, name string, namespace stri
 		name = "presence-" + name
 	}
 	return &PusherPresenceChannel{
-		PusherPrivateChannel: NewPusherPrivateChannel(client, name, namespace),
+		PusherChannel: NewPusherChannel(client, name, namespace),
 	}
 }
 

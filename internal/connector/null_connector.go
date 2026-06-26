@@ -38,11 +38,54 @@ func (c *NullConnector) Channel(name string) channel.Channel {
 }
 
 func (c *NullConnector) PrivateChannel(name string) channel.Channel {
-	return c.Channel(name)
+	key := "private-" + name
+	if ch, ok := c.channels[key]; ok {
+		return ch
+	}
+	ch := &channel.NullChannel{}
+	c.channels[key] = ch
+	return ch
 }
 
 func (c *NullConnector) PresenceChannel(name string) channel.PresenceChannel {
-	return &channel.NullPresenceChannel{}
+	key := "presence-" + name
+	if ch, ok := c.channels[key]; ok {
+		return ch.(channel.PresenceChannel)
+	}
+	ch := &channel.NullPresenceChannel{}
+	c.channels[key] = ch
+	return ch
+}
+
+// Leave unsubscribes all subscription types for a logical channel name.
+func (c *NullConnector) Leave(channel string) {
+	for _, name := range []string{
+		channel,
+		"private-" + channel,
+		"private-encrypted-" + channel,
+		"presence-" + channel,
+	} {
+		c.LeaveChannel(name)
+	}
+}
+
+// LeaveChannel unsubscribes a single channel by exact registry name.
+func (c *NullConnector) LeaveChannel(name string) {
+	ch, ok := c.channels[name]
+	if !ok {
+		return
+	}
+	delete(c.channels, name)
+	ch.Unsubscribe()
+}
+
+// LeaveAllChannels unsubscribes every channel and clears the registry.
+func (c *NullConnector) LeaveAllChannels() {
+	snapshot := c.channels
+	c.channels = make(map[string]channel.Channel)
+	for _, ch := range snapshot {
+		ch.Unsubscribe()
+	}
 }
 
 func (c *NullConnector) SocketID() string {
