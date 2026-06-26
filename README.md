@@ -81,7 +81,149 @@ func main() {
 | `Private(name)` | Private channel (no `private-` prefix in the name you pass) |
 | `Presence(name)` | Presence channel + `Here` / `Joining` / `Leaving` |
 
-Channel methods follow Echo JS: `Listen`, `ListenForWhisper`, `Whisper`, `StopListening`, `StopListeningForWhisper`.
+Channel methods follow Echo JS: `Listen`, `ListenForWhisper`, `Whisper`, `StopListening`, `StopListeningForWhisper`, `Subscribed`, `Error`, `Notification`, `ListenToAll`, and matching `Stop*` variants.
+
+Echo client also exposes `EncryptedPrivate`, `Join`, `Leave`, `LeaveChannel`, `LeaveAllChannels`, `Listen` (shorthand), `ConnectionStatus`, and `OnConnectionChange`.
+
+## Examples
+
+| Example | Description |
+|---------|-------------|
+| [`examples/worker`](examples/worker/main.go) | Background worker on `private-App.Models.User.{id}` |
+| [`examples/http_socket_id`](examples/http_socket_id/main.go) | Manual `X-Socket-Id` on outbound HTTP |
+
+Worker env vars: `REVERB_APP_KEY`, `API_TOKEN`, optional `REVERB_HOST`, `REVERB_PORT`, `AUTH_URL`, `USER_ID`.
+
+HTTP example env vars: same plus `API_URL` for the outbound POST target.
+
+```bash
+go run ./examples/worker
+go run ./examples/http_socket_id
+```
+
+## Parity with Laravel Echo
+
+Current status vs [Laravel Echo 2.x](https://github.com/laravel/echo/tree/2.x/packages/laravel-echo/src). See [ROADMAP.md](ROADMAP.md) and [phases/](phases/) for implementation history.
+
+### Echo client
+
+| API | Laravel Echo | echo-go | Notes |
+|-----|--------------|---------|-------|
+| `channel(name)` | ✅ | ✅ | |
+| `private(name)` | ✅ | ✅ | Prefix applied automatically |
+| `encryptedPrivate(name)` | ✅ | ✅ | `EncryptedPrivate` |
+| `join(name)` | ✅ | ✅ | Alias for `Presence` |
+| `leave(name)` | ✅ | ✅ | Leaves all variants of a logical name |
+| `leaveChannel(name)` | ✅ | ✅ | Exact registry name |
+| `leaveAllChannels()` | ✅ | ✅ | |
+| `listen(channel, event, cb)` | ✅ | ✅ | Shorthand on `Echo` |
+| `socketId()` | ✅ | ✅ | `SocketID()` |
+| `connectionStatus()` | ✅ | ✅ | `ConnectionStatus()` |
+| `onConnectionChange(cb)` | ✅ | ✅ | Returns unsubscribe func |
+| Auto-connect on construct | ✅ | ✅ | Default `AutoConnect: true`; set `false` for explicit `Connect()` |
+| `ably` broadcaster | ✅ | ✅ | Same Pusher connector, empty cluster |
+| Custom `broadcaster: function` | ✅ | ✅ | `Config.Connector` injection |
+| Invalid broadcaster → error | ✅ | ✅ | `New` returns error |
+| HTTP interceptors | ✅ | N/A | Browser-only; see intentional differences |
+| Socket.IO broadcaster | ✅ | ❌ | Out of scope |
+
+### Connector
+
+| API | Laravel Echo | echo-go | Notes |
+|-----|--------------|---------|-------|
+| Default auth endpoints | ✅ | ✅ | `/broadcasting/auth`, `/broadcasting/user-auth` |
+| `bearerToken` header merge | ✅ | ✅ | `Config.BearerToken` |
+| `csrfToken` header merge | ✅ | ✅ | `Config.CSRFToken` |
+| `userAuthentication` | ✅ | ✅ | `Config.UserAuthentication` |
+| `signin()` | ✅ | ✅ | `Signin()` |
+| Channel registry (prefixed keys) | ✅ | ✅ | |
+| `leave` / `leaveChannel` | ✅ | ✅ | |
+
+### Channel
+
+| API | Laravel Echo | echo-go | Notes |
+|-----|--------------|---------|-------|
+| `listen(event, cb)` | ✅ | ✅ | |
+| `listenForWhisper` | ✅ | ✅ | `.client-{event}` via formatter |
+| `whisper` | ✅ | ✅ | |
+| `stopListening(event, cb?)` | ✅ | ✅ | Optional callback unbind |
+| `notification(cb)` | ✅ | ✅ | Laravel broadcast notifications event |
+| `subscribed(cb)` | ✅ | ✅ | |
+| `error(cb)` | ✅ | ✅ | |
+| `listenToAll(cb)` | ✅ | ✅ | |
+| `stopListeningToAll(cb?)` | ✅ | ✅ | |
+| `unsubscribe()` | ✅ | ⚠️ | Internal; use `Leave` / `LeaveChannel` on `Echo` |
+
+### Presence
+
+| Behavior | Laravel Echo | echo-go | Notes |
+|----------|--------------|---------|-------|
+| `here` payload | `Object.values(members)` | ✅ | `[]any` of member info |
+| `joining` / `leaving` payload | `member.info` | ✅ | Info object only |
+
+### Encrypted private
+
+| API | Laravel Echo | echo-go | Notes |
+|-----|--------------|---------|-------|
+| `private-encrypted-` prefix | ✅ | ✅ | |
+| Subscribe + decrypt | ✅ | ✅ | Via pusher-go encryption |
+
+## Intentional Go differences
+
+| Topic | Laravel Echo | echo-go |
+|-------|--------------|---------|
+| HTTP interceptors | Auto `X-Socket-Id` | Caller sets header on their `http.Client` |
+| CSRF / bearer | DOM or options | `Config` fields only |
+| Connect timing | Constructor | `Connect()` or default `AutoConnect` |
+| Callback types | `CallableFunction` | `func(data any)` |
+| Socket.IO | Supported | Out of scope |
+
+## Configuration reference
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `Broadcaster` | — | `"reverb"`, `"pusher"`, `"ably"`, or `"null"` |
+| `Key` | — | Reverb/Pusher app key |
+| `Cluster` | `"mt1"` (pusher-go) | Pusher cluster; ignored when `Host` set for Reverb |
+| `Host` | — | WebSocket host for Reverb/self-hosted |
+| `Port` | — | WebSocket port |
+| `TLS` | `false` | Use WSS |
+| `Namespace` | `"App.Events"` | Event name prefix; `&""` disables |
+| `Auth.Endpoint` | `"/broadcasting/auth"` | Channel authorization URL |
+| `Auth.Headers` | merged | Extra headers; Bearer/CSRF merged on `New` |
+| `UserAuthentication.Endpoint` | `"/broadcasting/user-auth"` | Pusher user auth URL |
+| `UserAuthentication.Headers` | merged | Same merge rules as `Auth.Headers` |
+| `BearerToken` | — | Merged as `Authorization: Bearer …` |
+| `CSRFToken` | — | Merged as `X-CSRF-TOKEN` |
+| `AutoConnect` | `true` | Connect in `New` when true/nil |
+| `Connector` | `nil` | Custom backend; ignores `Broadcaster` |
+| `AuthEndpoint` | — | Deprecated; use `Auth.Endpoint` |
+| `AuthHeaders` | — | Deprecated; use `Auth.Headers` |
+
+## Running tests
+
+Unit tests (no WebSocket server required):
+
+```bash
+go test ./...
+```
+
+Integration tests against Reverb + Laravel auth (skipped when env is unset):
+
+```bash
+export ECHO_TEST_REVERB_HOST=localhost
+export ECHO_TEST_REVERB_PORT=8080
+export ECHO_TEST_REVERB_KEY=your-key
+export ECHO_TEST_AUTH_URL=http://localhost:8000/broadcasting/auth
+export ECHO_TEST_AUTH_TOKEN=your-token
+# Optional — for event trigger tests:
+export ECHO_TEST_REVERB_APP_ID=your-app-id
+export ECHO_TEST_REVERB_SECRET=your-secret
+
+go test -tags=integration ./internal/integration/...
+```
+
+CI runs unit tests and `go build ./examples/...` on push. Integration tests are manual unless repo secrets are configured.
 
 ## Authentication
 
@@ -162,6 +304,12 @@ req.Header.Set("Authorization", "Bearer "+token)
 1. **Protocol** — Reverb speaks the Pusher WebSocket protocol; echo-go delegates transport to pusher-go.
 2. **Authentication** — Private/presence channels use pusher-go `ChannelAuthorization`, wired from `Config.Auth`. User auth uses `Config.UserAuthentication` and `Signin()`.
 3. **Namespaces** — `Config.Namespace` prefixes event names (Laravel-style `.Event` syntax supported via the formatter).
+
+## Further reading
+
+- [ROADMAP.md](ROADMAP.md) — scope, gap analysis, success criteria
+- [phases/](phases/) — phased implementation notes
+- [CHANGELOG.md](CHANGELOG.md) — release history
 
 ## License
 

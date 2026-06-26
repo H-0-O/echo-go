@@ -264,6 +264,11 @@ func TestNullBroadcasterNoKey(t *testing.T) {
 	}
 }
 
+// TestNullBroadcasterCI is the CI smoke test for the null broadcaster (no WebSocket server).
+func TestNullBroadcasterCI(t *testing.T) {
+	TestNullBroadcasterNoKey(t)
+}
+
 type stubConnector struct {
 	*connector.NullConnector
 	connectCalls int

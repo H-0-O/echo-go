@@ -31,35 +31,51 @@ const (
 	StatusFailed       = connector.StatusFailed
 )
 
-// AuthConfig configures channel authorization requests.
+// AuthConfig configures channel authorization requests (Laravel Echo authEndpoint / auth.headers).
 type AuthConfig struct {
+	// Endpoint is the channel auth URL. Default: "/broadcasting/auth".
 	Endpoint string
-	Headers  map[string]string
+	// Headers are sent with each channel auth POST. Bearer and CSRF from Config are merged first.
+	Headers map[string]string
 }
 
-// UserAuthConfig configures Pusher user authentication requests (wired in Phase 4).
+// UserAuthConfig configures Pusher user authentication (Laravel Echo userAuthentication).
 type UserAuthConfig struct {
+	// Endpoint is the user auth URL. Default: "/broadcasting/user-auth".
 	Endpoint string
-	Headers  map[string]string
+	// Headers are sent with each user auth POST. Bearer and CSRF from Config are merged first.
+	Headers map[string]string
 }
 
-// Config configures a new Echo client.
+// Config configures a new Echo client (Laravel Echo EchoOptions, non-browser subset).
 type Config struct {
-	Broadcaster        string
-	Key                string
-	Cluster            string
-	Host               string
-	Port               int
-	TLS                bool
-	Namespace          *string // nil → "App.Events"; &"" disables prefixing
-	Auth               AuthConfig
+	// Broadcaster selects the backend: "reverb", "pusher", "ably", or "null".
+	Broadcaster string
+	// Key is the Reverb/Pusher application key.
+	Key string
+	// Cluster is the Pusher cluster (e.g. "mt1"). Ignored for Reverb when Host is set.
+	Cluster string
+	// Host is the WebSocket host for Reverb or self-hosted Pusher-compatible servers.
+	Host string
+	// Port is the WebSocket port.
+	Port int
+	// TLS enables WSS when true.
+	TLS bool
+	// Namespace prefixes event names. nil → "App.Events"; pointer to "" disables prefixing.
+	Namespace *string
+	// Auth configures private/presence/encrypted channel authorization.
+	Auth AuthConfig
+	// UserAuthentication configures Pusher user authentication (Signin).
 	UserAuthentication UserAuthConfig
-	BearerToken        string
-	CSRFToken          string
-	AutoConnect        *bool
+	// BearerToken is merged as Authorization: Bearer … on both auth endpoints.
+	BearerToken string
+	// CSRFToken is merged as X-CSRF-TOKEN on both auth endpoints.
+	CSRFToken string
+	// AutoConnect connects in New when true or nil (default). Set false for explicit Connect().
+	AutoConnect *bool
 
 	// Connector, when non-nil, is used instead of Broadcaster string resolution.
-	// Broadcaster is ignored when Connector is set.
+	// Broadcaster is ignored when Connector is set (Go equivalent of broadcaster: function).
 	Connector Connector
 
 	// Deprecated: use Auth.Endpoint. Migrated in applyDefaults when Auth.Endpoint is empty.
