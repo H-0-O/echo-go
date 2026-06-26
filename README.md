@@ -4,6 +4,8 @@ A Go **library** that mirrors the [Laravel Echo](https://laravel.com/docs/broadc
 
 Built on [github.com/H-0-O/pusher-go](https://github.com/H-0-O/pusher-go).
 
+> **Vibe coded.** This library was built iteratively with AI-assisted development — shaped toward Laravel Echo parity, not transcribed line-by-line from the JS source. It is tested and documented, but the process was fast-and-loose by design. Check the parity tables below and [ROADMAP.md](ROADMAP.md) for what is done vs. planned; open an issue if the vibes lie.
+
 ## Installation
 
 ```bash
