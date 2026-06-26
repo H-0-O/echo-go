@@ -20,6 +20,14 @@ func (c *NullConnector) Connect() error { return nil }
 
 func (c *NullConnector) Disconnect() error { return nil }
 
+func (c *NullConnector) ConnectionStatus() ConnectionStatus {
+	return StatusConnected
+}
+
+func (c *NullConnector) OnConnectionChange(_ func(ConnectionStatus)) func() {
+	return func() {}
+}
+
 func (c *NullConnector) Channel(name string) channel.Channel {
 	if ch, ok := c.channels[name]; ok {
 		return ch

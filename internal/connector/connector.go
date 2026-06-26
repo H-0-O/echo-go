@@ -24,6 +24,13 @@ type Connector interface {
 	// SocketID returns the socket ID for the current connection.
 	SocketID() string
 
+	// ConnectionStatus returns the current mapped connection status.
+	ConnectionStatus() ConnectionStatus
+
+	// OnConnectionChange registers a callback for connection status transitions.
+	// The returned function unsubscribes the callback.
+	OnConnectionChange(cb func(ConnectionStatus)) func()
+
 	// On registers a callback for a connection event.
 	// Common events: "connecting", "connected", "disconnected", "error"
 	On(event string, callback func(data interface{}))

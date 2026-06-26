@@ -10,13 +10,16 @@ import (
 
 // PusherConfig holds configuration specifically for Pusher/Reverb.
 type PusherConfig struct {
-	Key          string
-	Host         string
-	Port         int
-	Namespace    string
-	AuthEndpoint string
-	AuthHeaders  map[string]string
-	TLS          bool
+	Key              string
+	Host             string
+	Port             int
+	Cluster          string
+	Namespace        string
+	TLS              bool
+	AuthEndpoint     string
+	AuthHeaders      map[string]string
+	UserAuthEndpoint string
+	UserAuthHeaders  map[string]string
 }
 
 // PusherConnector handles connection to Pusher-compatible servers (like Reverb).
@@ -29,9 +32,14 @@ type PusherConnector struct {
 
 // NewPusherConnector creates a new PusherConnector.
 func NewPusherConnector(config PusherConfig) (*PusherConnector, error) {
+	cluster := config.Cluster
+	if cluster == "" {
+		cluster = "mt1" // ponytail: pusher-go ValidateOptions requires cluster; ignored when WsHost set
+	}
+
 	client, err := pusher.NewPusher(config.Key, pusher.Options{
 		Options: types.Options{
-			Cluster:  "mt1", // ponytail: required by ValidateOptions; unused when WsHost set
+			Cluster:  cluster,
 			WsHost:   config.Host,
 			WsPort:   config.Port,
 			ForceTLS: types.BoolPtr(config.TLS),
@@ -39,6 +47,11 @@ func NewPusherConnector(config PusherConfig) (*PusherConnector, error) {
 				Endpoint:  config.AuthEndpoint,
 				Transport: "ajax",
 				Headers:   config.AuthHeaders,
+			},
+			UserAuthentication: types.UserAuthenticationConfig{
+				Endpoint:  config.UserAuthEndpoint,
+				Transport: "ajax",
+				Headers:   config.UserAuthHeaders,
 			},
 		},
 	})
@@ -63,6 +76,27 @@ func (c *PusherConnector) Connect() error {
 func (c *PusherConnector) Disconnect() error {
 	c.client.Disconnect()
 	return nil
+}
+
+// ConnectionStatus returns the current mapped connection status.
+func (c *PusherConnector) ConnectionStatus() ConnectionStatus {
+	return MapConnectionStatus(c.client.ConnectionState())
+}
+
+// OnConnectionChange registers a callback for connection status transitions.
+func (c *PusherConnector) OnConnectionChange(cb func(ConnectionStatus)) func() {
+	updateStatus := func(_ any) {
+		cb(c.ConnectionStatus())
+	}
+	events := []string{"state_change", "connected", "disconnected"}
+	for _, event := range events {
+		c.client.Connection.Bind(event, updateStatus)
+	}
+	return func() {
+		for _, event := range events {
+			c.client.Connection.Unbind(event, updateStatus)
+		}
+	}
 }
 
 // Channel returns a public channel.

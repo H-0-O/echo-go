@@ -3,6 +3,8 @@
 package echo
 
 import (
+	"fmt"
+
 	"github.com/H-0-O/echo-go/internal/channel"
 	"github.com/H-0-O/echo-go/internal/connector"
 )
@@ -13,16 +15,49 @@ type Channel = channel.Channel
 // PresenceChannel is a presence broadcast channel subscription.
 type PresenceChannel = channel.PresenceChannel
 
+// ConnectionStatus is the high-level WebSocket connection state.
+type ConnectionStatus = connector.ConnectionStatus
+
+// Connection status constants.
+const (
+	StatusConnected    = connector.StatusConnected
+	StatusDisconnected = connector.StatusDisconnected
+	StatusConnecting   = connector.StatusConnecting
+	StatusReconnecting = connector.StatusReconnecting
+	StatusFailed       = connector.StatusFailed
+)
+
+// AuthConfig configures channel authorization requests.
+type AuthConfig struct {
+	Endpoint string
+	Headers  map[string]string
+}
+
+// UserAuthConfig configures Pusher user authentication requests (wired in Phase 4).
+type UserAuthConfig struct {
+	Endpoint string
+	Headers  map[string]string
+}
+
 // Config configures a new Echo client.
 type Config struct {
-	Broadcaster  string
-	Host         string
-	Key          string
-	Port         int
-	Namespace    string
+	Broadcaster        string
+	Key                string
+	Cluster            string
+	Host               string
+	Port               int
+	TLS                bool
+	Namespace          *string // nil → "App.Events"; &"" disables prefixing
+	Auth               AuthConfig
+	UserAuthentication UserAuthConfig
+	BearerToken        string
+	CSRFToken          string
+	AutoConnect        *bool
+
+	// Deprecated: use Auth.Endpoint. Migrated in applyDefaults when Auth.Endpoint is empty.
 	AuthEndpoint string
-	AuthHeaders  map[string]string
-	TLS          bool
+	// Deprecated: use Auth.Headers. Migrated in applyDefaults.
+	AuthHeaders map[string]string
 }
 
 // Echo is the main client. Create one with [New].
@@ -33,19 +68,20 @@ type Echo struct {
 
 // New creates an Echo client for the given broadcaster configuration.
 func New(config Config) (*Echo, error) {
+	config = applyDefaults(config)
+
 	var conn connector.Connector
 
 	switch config.Broadcaster {
 	case "reverb", "pusher":
-		pusherConn, err := connector.NewPusherConnector(connector.PusherConfig{
-			Key:          config.Key,
-			Host:         config.Host,
-			Port:         config.Port,
-			Namespace:    config.Namespace,
-			AuthEndpoint: config.AuthEndpoint,
-			AuthHeaders:  config.AuthHeaders,
-			TLS:          config.TLS,
-		})
+		pusherConn, err := newPusherConnector(config)
+		if err != nil {
+			return nil, err
+		}
+		conn = pusherConn
+	case "ably":
+		config.Cluster = ""
+		pusherConn, err := newPusherConnector(config)
 		if err != nil {
 			return nil, err
 		}
@@ -53,18 +89,102 @@ func New(config Config) (*Echo, error) {
 	case "null":
 		conn = connector.NewNullConnector()
 	default:
-		conn = connector.NewNullConnector()
+		return nil, fmt.Errorf("unknown broadcaster %q", config.Broadcaster)
 	}
 
-	return &Echo{
+	e := &Echo{
 		connector: conn,
 		config:    config,
-	}, nil
+	}
+
+	if autoConnect(config) {
+		if err := e.Connect(); err != nil {
+			return nil, err
+		}
+	}
+
+	return e, nil
+}
+
+func newPusherConnector(config Config) (*connector.PusherConnector, error) {
+	return connector.NewPusherConnector(connector.PusherConfig{
+		Key:              config.Key,
+		Host:             config.Host,
+		Port:             config.Port,
+		Cluster:          config.Cluster,
+		Namespace:        resolveNamespace(config.Namespace),
+		TLS:              config.TLS,
+		AuthEndpoint:     config.Auth.Endpoint,
+		AuthHeaders:      config.Auth.Headers,
+		UserAuthEndpoint: config.UserAuthentication.Endpoint,
+		UserAuthHeaders:  config.UserAuthentication.Headers,
+	})
+}
+
+func resolveNamespace(ns *string) string {
+	if ns == nil {
+		return "App.Events"
+	}
+	return *ns
+}
+
+func autoConnect(c Config) bool {
+	return c.AutoConnect == nil || *c.AutoConnect
+}
+
+func applyDefaults(c Config) Config {
+	if c.Auth.Endpoint == "" && c.AuthEndpoint != "" {
+		c.Auth.Endpoint = c.AuthEndpoint
+	}
+	if c.Auth.Endpoint == "" {
+		c.Auth.Endpoint = "/broadcasting/auth"
+	}
+	if c.UserAuthentication.Endpoint == "" {
+		c.UserAuthentication.Endpoint = "/broadcasting/user-auth"
+	}
+
+	if c.Namespace == nil {
+		defaultNS := "App.Events"
+		c.Namespace = &defaultNS
+	}
+
+	c.Auth.Headers = mergeAuthHeaders(c.BearerToken, c.CSRFToken, c.Auth.Headers, c.AuthHeaders)
+	c.UserAuthentication.Headers = mergeAuthHeaders(c.BearerToken, c.CSRFToken, c.UserAuthentication.Headers, nil)
+
+	return c
+}
+
+func mergeAuthHeaders(bearer, csrf string, headers, deprecated map[string]string) map[string]string {
+	out := make(map[string]string)
+	if bearer != "" {
+		out["Authorization"] = "Bearer " + bearer
+	}
+	if csrf != "" {
+		out["X-CSRF-TOKEN"] = csrf
+	}
+	for k, v := range headers {
+		out[k] = v
+	}
+	for k, v := range deprecated {
+		out[k] = v
+	}
+	return out
 }
 
 // SocketID returns the current connection socket ID, or empty if not connected.
 func (e *Echo) SocketID() string {
 	return e.connector.SocketID()
+}
+
+// ConnectionStatus returns the current mapped connection status.
+func (e *Echo) ConnectionStatus() ConnectionStatus {
+	return e.connector.ConnectionStatus()
+}
+
+// OnConnectionChange registers a callback for connection status transitions.
+// The returned function unsubscribes the callback.
+func (e *Echo) OnConnectionChange(cb func(ConnectionStatus)) func() {
+	return e.connector.OnConnectionChange(cb)
 }
 
 // Channel returns a public channel subscription.
