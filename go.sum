@@ -1,5 +1,3 @@
-github.com/H-0-O/pusher-go v0.0.0-20260626185035-a743c6a8135b h1:bdElibouQ0jYp0pdQ0avhcjxE+77M/iXGFPKc7oBGeo=
-github.com/H-0-O/pusher-go v0.0.0-20260626185035-a743c6a8135b/go.mod h1:7TPoHlB6HktG8zNFEDWXRbKYg2x2k1AFyIhgRjNrp6s=
 github.com/H-0-O/pusher-go v0.1.0 h1:itorQ7ZZZOyUgs3/2MYq0va5TH8LifqMf1+URhm0HFs=
 github.com/H-0-O/pusher-go v0.1.0/go.mod h1:7TPoHlB6HktG8zNFEDWXRbKYg2x2k1AFyIhgRjNrp6s=
 github.com/coder/websocket v1.8.14 h1:9L0p0iKiNOibykf283eHkKUHHrpG7f65OE3BhhO7v9g=
