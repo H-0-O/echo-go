@@ -29,6 +29,14 @@ func (f *EventFormatter) Format(event string) string {
 	return event
 }
 
+// StripNamespace removes the configured namespace prefix from a wire event name.
+func (f *EventFormatter) StripNamespace(event string) string {
+	if f.Namespace != "" && strings.HasPrefix(event, f.Namespace+".") {
+		return event[len(f.Namespace)+1:]
+	}
+	return event
+}
+
 // SetNamespace sets the namespace.
 func (f *EventFormatter) SetNamespace(value string) {
 	f.Namespace = value
